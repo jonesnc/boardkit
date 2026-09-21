@@ -46,6 +46,7 @@ stopped :: proc(s: ^Stop) -> bool {
 
 Board :: struct {
 	mtime:       time.Time,
+	path:        string, // the file it was loaded from; a move relaunches the viewer
 	stop:        ^Stop,
 	state:       Value,
 	direction:   string,
@@ -563,6 +564,7 @@ maybe_str :: proc(v: Value, key: string) -> Maybe(string) {
 
 free_board :: proc(b: ^Board) {
 	rt.destroy(b.state)
+	delete(b.path)
 	delete(b.direction)
 	if s, ok := b.parent.?; ok do delete(s)
 	if s, ok := b.tab.?; ok do delete(s)
@@ -680,7 +682,7 @@ main :: proc() {
 
 			// new or edited boards
 			for name, mtime in on_disk {
-				if b, ok := boards[name]; ok && b.mtime == mtime do continue
+				if b, ok := boards[name]; ok && b.mtime == mtime && b.path == path_of[name] do continue
 				data, rerr := os.read_entire_file(path_of[name], context.temp_allocator)
 				def: Value
 				perr := ""
@@ -717,13 +719,14 @@ main :: proc() {
 				if r, ok := rt.f64_of(h, "ratio"); ok do ratio = r
 				parent, tab, workspace := maybe_str(h, "parent"), maybe_str(h, "tab"), maybe_str(h, "workspace")
 				pane: Maybe(string)
+				moved := had_old && old.path != path_of[name]
 				if had_old {
-					if same_placement(&old, direction, ratio, parent, tab, workspace) {
+					if same_placement(&old, direction, ratio, parent, tab, workspace) && !moved {
 						pane = old.pane // same placement: keep the pane (the viewer hot-reloads the spec itself)
 					} else if p, ok := old.pane.?; ok {
-						// placement changed: close the old pane; it is recreated in the new place below
+						// the viewer holds a path, so a moved file needs a new one; same for a new place
 						herdr("pane", "close", p)
-						log("%s: placement changed, moving pane", name)
+						log("%s: %s, reopening pane", name, "board file moved" if moved else "placement changed")
 					}
 				} else if p, ok := board_panes()[name]; ok {
 					pane = p // adopt a pane from a previous boardd run
@@ -737,6 +740,7 @@ main :: proc() {
 				spec_text := rt.to_json(spec, context.temp_allocator)
 				nb := Board{
 					mtime        = mtime,
+					path         = strings.clone(path_of[name]),
 					stop         = stop,
 					state        = state,
 					direction    = strings.clone(direction),

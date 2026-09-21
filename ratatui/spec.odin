@@ -305,19 +305,28 @@ draw :: proc(t: Term, sp: Spec) -> i32 {
 	context.temp_allocator = scratch()
 	defer free_all(context.temp_allocator)
 	poll_state_file()
-	if now := mtime_of(sp.path); now != sp.mtime {
+	// Retry while broken: a missing file has no mtime to change, so a spec that was moved or
+	// deleted would keep its banner forever even once the file is back.
+	if now := mtime_of(sp.path); now != sp.mtime || sp.err != "" {
 		sp.mtime = now
 		v, err := load_file(sp.path)
-		delete(sp.err)
-		sp.err = ""
 		if err == "" {
+			delete(sp.err)
+			sp.err = ""
 			destroy(sp.value)
 			sp.value = v
+			sp.generation += 1 // repaint (the banner is gone)
 		} else {
-			sp.err = fmt.aprintf("reload failed: %s", err)
-			set_err(err)
+			msg := fmt.aprintf("reload failed: %s", err)
+			if msg != sp.err { // only on a change, or a bad spec would repaint every frame
+				delete(sp.err)
+				sp.err = msg
+				set_err(err)
+				sp.generation += 1
+			} else {
+				delete(msg)
+			}
 		}
-		sp.generation += 1 // repaint (a failed reload shows its banner)
 	}
 	if take_resized() != 0 do dirty = true
 	key := [3]u64{u64(uintptr(sp)), sp.generation, state_ver}
