@@ -7,7 +7,7 @@ Open work, most useful first. Each item says what is blocking it, if anything.
 ## Housekeeping
 
 - A board source that calls a tool from `~/.local/bin` needs it on `boardd`'s PATH (`systemd/boardd.service` sets one). After changing the service file, `systemctl --user daemon-reload` and restart it.
-- Rebuild the viewer after every shim change (`odin build viewer ...`, see README), then restart `boardd`. A stale viewer keeps the old widgets.
+- Rebuild `boardd` after every shim change (see README), then restart it. Open panes keep the old binary until they are reopened.
 
 ## Smaller items
 

@@ -85,7 +85,7 @@ load_validates_each_template :: proc(t: ^testing.T) {
 all_shipped_specs_validate :: proc(t: ^testing.T) {
 	root, _ := filepath.join({#directory, ".."}, context.temp_allocator)
 	n := 0
-	for dir in ([]string{"boards", "examples/boards", "specdemo"}) {
+	for dir in ([]string{"examples/boards"}) {
 		d, _ := filepath.join({root, dir}, context.temp_allocator)
 		entries, _ := os.read_all_directory_by_path(d, context.temp_allocator)
 		for e in entries {
@@ -224,12 +224,12 @@ json_round_trip :: proc(t: ^testing.T) {
 // Timing only; always passes. Logs resolve and resolve+render+diff cost per frame.
 @(test)
 frame_cost :: proc(t: ^testing.T) {
-	path, _ := filepath.join({#directory, "..", "specdemo", "dash.json"}, context.temp_allocator)
+	path, _ := filepath.join({#directory, "..", "examples", "boards", "bindings.json"}, context.temp_allocator)
 	data, _ := os.read_entire_file(path, context.temp_allocator)
-	spec := j(string(data))
-	st := j(`{"screen": 0, "sel": 1, "confirm": true, "cpu": 0.5, "cpu_label": "CPU 50%", "popup_text": "Kill?",
+	spec, _ := get(j(string(data)), "spec")
+	st := j(`{"d": {"sel": 1, "confirm": true, "cpu": 0.5, "cpu_label": "CPU 50%", "popup_text": "Kill?",
 		"names": ["nginx","postgres","redis","odin-demo"],
-		"procs": [{"line":"nginx pid 1 mem 100 MB"},{"line":"postgres pid 2 mem 200 MB"},{"line":"redis pid 3 mem 300 MB"},{"line":"odin pid 4 mem 400 MB"}]}`)
+		"procs": [{"line":"nginx pid 1 mem 100 MB"},{"line":"postgres pid 2 mem 200 MB"},{"line":"redis pid 3 mem 300 MB"},{"line":"odin pid 4 mem 400 MB"}]}}`)
 	for size in ([][2]u16{{120, 40}, {250, 70}}) {
 		term := test_init(size.x, size.y)
 		defer restore(term)

@@ -7,6 +7,6 @@ C-ABI wrapper in `shim/` that talks to ratatui and crossterm (terminal setup, ke
 input, drawing one widget into a rect, layout solving).
 
 Everything else is Odin: JSON specs and state, bindings, catalog validation,
-streaming, scroll/focus, hot reload, the viewer, and `boardd`.
+streaming, scroll/focus, hot reload, and `boardd` (daemon and `boardd view`).
 
 Before you add Rust, ask: does this call ratatui or crossterm directly? If not, it goes in Odin.

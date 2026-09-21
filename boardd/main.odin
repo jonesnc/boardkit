@@ -6,7 +6,7 @@ package main
 // one herdr pane running the viewer on it. Adding, editing or deleting the file adds, updates or
 // removes the board. A pane you close by hand stays closed until you edit the file again.
 //
-// usage: boardd [root] [extra board dir...] | boardd --check [dir...]   (root defaults to the repo that holds this binary, <root>/boardd/boardd; boards live in <root>/boards)
+// usage: boardd [root] [extra board dir...] | boardd --check [dir...] | boardd view <spec-or-board.json> [state.json]   (root defaults to the repo that holds this binary, <root>/boardd/boardd; boards live in <root>/boards)
 
 import "core:encoding/json"
 import "core:fmt"
@@ -214,12 +214,12 @@ split_pane :: proc(parent: Maybe(string), direction: string, ratio: Maybe(f64), 
 	return id, id != ""
 }
 
-viewer_cmd :: proc(viewer, spec_path, state_dir, name: string) -> string {
-	return fmt.tprintf("%s %s %s/%s.json", viewer, spec_path, state_dir, name)
+viewer_cmd :: proc(self, spec_path, state_dir, name: string) -> string {
+	return fmt.tprintf("%s view %s %s/%s.json", self, spec_path, state_dir, name)
 }
 
 viewer_running :: proc(name: string) -> bool {
-	code, _, _ := run({"pgrep", "-f", fmt.tprintf("viewer .*/%s\\.json", name)})
+	code, _, _ := run({"pgrep", "-f", fmt.tprintf("(boardd view|viewer) .*/%s\\.json", name)})
 	return code == 0
 }
 
@@ -576,6 +576,33 @@ set_pane :: proc(b: ^Board, id: Maybe(string)) {
 	if s, ok := id.?; ok do b.pane = strings.clone(s)
 }
 
+// `boardd view <spec-or-board.json> [state.json]`: draw one board full-screen at 60 fps. Spec and
+// state files hot-reload when they change. q or Esc quits. Scrollable widgets: Tab focus,
+// j/k/arrows, PgUp/PgDn, g/G. boardd runs this in each board pane.
+view :: proc(args: []string) -> ! {
+	if len(args) < 1 {
+		fmt.eprintln("usage: boardd view <spec-or-board.json> [state.json]")
+		os.exit(2)
+	}
+	spec := rt.spec_load(strings.clone_to_cstring(args[0]))
+	if spec == nil {
+		fmt.eprintln(rt.last_error())
+		os.exit(1)
+	}
+	if len(args) > 1 do rt.state_watch(strings.clone_to_cstring(args[1]))
+	t := rt.init()
+	clock := rt.clock_make(60)
+	loop: for {
+		rt.draw(t, spec)
+		for k := rt.frame_wait(&clock); k != i32(rt.Key.None); k = rt.poll_key(0) {
+			if k == 'q' || k == i32(rt.Key.Esc) do break loop
+			rt.ui_key(k)
+		}
+	}
+	rt.restore(t)
+	os.exit(0)
+}
+
 main :: proc() {
 	// Source threads come and go on every reload, and each holds multi-MB arena blocks (core:os
 	// temp arenas). By default glibc gives each thread its own malloc arena and, after the first
@@ -584,6 +611,7 @@ main :: proc() {
 	mallopt(M_MMAP_THRESHOLD, 128 * 1024)
 	mallopt(M_ARENA_MAX, 1)
 	args := os.args
+	if len(args) > 1 && args[1] == "view" do view(args[2:])
 	home := os.get_env("HOME", context.allocator)
 	exe_dir, _ := os.get_executable_directory(context.allocator) // <root>/boardd
 	default_root := filepath.dir(exe_dir)
@@ -607,11 +635,7 @@ main :: proc() {
 	os.make_directory_all(state_dir)
 	os.make_directory_all(dirs[0])
 	self_pane, has_self := os.lookup_env("HERDR_PANE_ID", context.allocator)
-	viewer := fmt.aprintf("%s/viewer/viewer", root)
-	if !os.exists(viewer) {
-		fmt.eprintln("viewer not built:", viewer)
-		os.exit(1)
-	}
+	viewer, _ := os.get_executable_path(context.allocator) // panes run `boardd view`
 	log("watching %v (state in %s)", dirs[:], state_dir)
 
 	msgs, _ = chan.create_buffered(chan.Chan(Msg), 4096, context.allocator)
