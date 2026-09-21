@@ -6,6 +6,33 @@ set -e
 cd "$(dirname "$0")"
 root=$(pwd)
 
+# Install the latest Odin release to ~/.local/share/odin (linked into ~/.local/bin) if odin is missing.
+install_odin() {
+	command -v gh >/dev/null || { echo "install.sh: odin not found, and gh is needed to fetch it" >&2; exit 1; }
+	case "$(uname -s)-$(uname -m)" in
+	Linux-x86_64) plat=linux-amd64 ;;
+	Linux-aarch64) plat=linux-arm64 ;;
+	Darwin-x86_64) plat=macos-amd64 ;;
+	Darwin-arm64) plat=macos-arm64 ;;
+	*) echo "install.sh: no Odin release for $(uname -sm); install odin by hand" >&2; exit 1 ;;
+	esac
+	echo "==> odin not found: installing the latest Odin release ($plat) to ~/.local/share/odin"
+	tmp=$(mktemp -d)
+	gh release download -R odin-lang/Odin -p "odin-$plat-*.tar.gz" -D "$tmp"
+	echo "==> unpacking Odin"
+	rm -rf "$HOME/.local/share/odin"
+	mkdir -p "$HOME/.local/share/odin" "$HOME/.local/bin"
+	tar xzf "$tmp"/odin-*.tar.gz -C "$HOME/.local/share/odin" --strip-components=1
+	rm -rf "$tmp"
+	ln -sf "$HOME/.local/share/odin/odin" "$HOME/.local/bin/odin"
+	export PATH="$HOME/.local/bin:$PATH"
+	echo "==> installed $(odin version) at ~/.local/bin/odin"
+	case ":$PATH_BEFORE:" in *":$HOME/.local/bin:"*) ;; *) echo "==> note: add ~/.local/bin to your PATH to use odin outside this script" ;; esac
+}
+PATH_BEFORE=$PATH
+[ -x "$HOME/.local/bin/odin" ] && export PATH="$HOME/.local/bin:$PATH"
+command -v odin >/dev/null || install_odin
+
 for tool in cargo odin; do
 	command -v "$tool" >/dev/null || { echo "install.sh: $tool not found" >&2; exit 1; }
 done
@@ -13,7 +40,9 @@ for tool in herdr jq; do
 	command -v "$tool" >/dev/null || echo "install.sh: warning: $tool not found (herdr: needed by the daemon; jq: used by the example boards)"
 done
 
+echo "==> building shim (cargo)"
 cargo build --release --manifest-path shim/Cargo.toml
+echo "==> building boardd (odin)"
 odin build boardd -out:boardd/boardd -extra-linker-flags:"-lgcc_s -lm -lpthread -ldl"
 mkdir -p "$HOME/.config/boardkit/boards"
 echo "built $root/boardd/boardd; put boards in ~/.config/boardkit/boards"
