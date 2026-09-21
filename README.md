@@ -19,7 +19,7 @@ A thin Rust shim exposes ratatui over a C ABI (terminal, keys, layout, one call 
 - `boardd/` the board daemon (Odin).
 - `viewer/` generic viewer: `viewer <spec-or-board.json> [state.json]`.
 - `boards/` local live boards, not in git. Keep your own boards in `~/.config/boardkit/boards/` (also watched). `examples/boards/` are ready-made ones to copy in.
-- `specdemo/` an interactive Odin program on the state API (its `dash.json` is also a test fixture); `claudedemo/` streams a spec from Claude.
+- `specdemo/` an interactive Odin program on the state API (its `dash.json` is also a test fixture)
 
 ## Build
 

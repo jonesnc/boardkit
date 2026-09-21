@@ -1,9 +1,7 @@
 /shim/target
 # built binaries
-/claudedemo/claudedemo
 /specdemo/specdemo
 # generated at runtime
-/claudedemo/.system.txt
 /viewer/viewer
 /boardd/boardd
 # live boards are local; put them in ~/.config/boardkit/boards (see README)
