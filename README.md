@@ -7,6 +7,14 @@ A thin Rust shim exposes ratatui over a C ABI (terminal, keys, layout, one call 
 
 Rust (cargo), Odin, and `jq` for the example boards. herdr only for the daemon; `boardd view` runs in any terminal.
 
+## Install
+
+    git clone https://github.com/jonesnc/boardkit && cd boardkit
+    ./install.sh               # build, install and start the boardd user service
+    ./install.sh --no-service  # build only
+
+Run it again after a `git pull`; it rebuilds and restarts the service.
+
 ## Build and test
 
     ./test.sh    # builds the shim and boardd, runs the tests, validates boards
@@ -32,7 +40,7 @@ Rebuild the shim first whenever `shim/` changes; `boardd` links it statically.
 - `boardd/` the one binary: `boardd [root] [dir...]` runs the daemon, `boardd view <spec-or-board.json> [state.json]` draws one board, `boardd --check [dir...]` validates board files.
 - `examples/boards/` ready-made boards (`bindings.json` shows `$state`, `$each`, `$if`). Copy one into a watched directory to show it.
 - `boards/` local live boards, not in git. Keep your own boards in `~/.config/boardkit/boards/`, which is also watched.
-- `systemd/boardd.service` a user-service template. `docs/` design notes and TODO.
+- `install.sh` build and install; `systemd/boardd.service` the unit template it fills in. `docs/` design notes and TODO.
 
 ## Spec format
 
@@ -57,13 +65,7 @@ A board is one JSON file: `{"herdr": {"tab","workspace","direction","ratio","par
 Watched directories: `<root>/boards` (root defaults to the repo that holds the binary), then extra args, then `$BOARDD_DIRS` (colon-separated) if set, else `~/.config/boardkit/boards`. Earlier directories win on a name clash.
 Source failures and bad reloads show in a red banner on the bottom row. If a spec mentions `/herdr`, state includes herdr's workspaces, tabs, panes and layout; if it mentions `/boardd`, state includes every board's status, pane, tab, data age and errors (see `examples/boards/boardd.json`). State files live in `~/.cache/boardkit`.
 
-Run it as a user service (from the repo root):
-
-    mkdir -p ~/.config/systemd/user
-    sed "s#@BOARDKIT@#$PWD#" systemd/boardd.service > ~/.config/systemd/user/boardd.service
-    systemctl --user daemon-reload && systemctl --user enable --now boardd
-
-Restart it after rebuilding. Open panes keep the old binary until they are reopened.
+`./install.sh` runs it as a systemd user service (logs: `journalctl --user -u boardd -f`). Open panes keep the old binary until they are reopened.
 
 ## From Odin
 

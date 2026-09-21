@@ -1,7 +1,5 @@
-# Run boardd as a persistent user service (not installed or enabled by default):
-#   mkdir -p ~/.config/systemd/user
-#   sed "s#@BOARDKIT@#$PWD#" systemd/boardd.service > ~/.config/systemd/user/boardd.service   (run in the repo root)
-#   systemctl --user daemon-reload && systemctl --user enable --now boardd
+# Template for the boardd user service. ./install.sh fills in @BOARDKIT@ (the repo path),
+# installs it to ~/.config/systemd/user/ and starts it.
 # Stop any boardd you started by hand first; two instances would fight over the same boards.
 # Boards with "parent": "self" split from boardd's own pane, which a service does not have.
 # Give them an explicit "parent" pane id (or another board) in their "herdr" block.
