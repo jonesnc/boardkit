@@ -40,7 +40,7 @@ Rebuild the shim first whenever `shim/` changes; `boardd` links it statically.
 - `boardd/` the one binary: `boardd [root] [dir...]` runs the daemon, `boardd view <spec-or-board.json> [state.json]` draws one board, `boardd --check [dir...]` validates board files.
 - `examples/boards/` ready-made boards (`bindings.json` shows `$state`, `$each`, `$if`). Copy one into a watched directory to show it.
 - `boards/` local live boards, not in git. Keep your own boards in `~/.config/boardkit/boards/`, which is also watched.
-- `install.sh` build and install; `systemd/boardd.service` the unit template it fills in. `docs/` design notes and TODO.
+- `install.sh` build and install; `systemd/boardd.service` the unit template it fills in. `docs/` design notes, TODO, and `writing-boards.md` (read before writing a board that pulls from a real backend).
 
 ## Spec format
 
