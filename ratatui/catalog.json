@@ -1,0 +1,218 @@
+{
+  "style": {
+    "fg": "color name or #rrggbb",
+    "bg": "color name or #rrggbb",
+    "bold": "bool",
+    "italic": "bool",
+    "underline": "bool",
+    "size": "constraint: this node's size inside a vstack/hstack (e.g. length:1). On a $each node it applies to every item"
+  },
+  "components": {
+    "block": {
+      "description": "Bordered container with a title",
+      "props": {
+        "title": "string",
+        "child": "component"
+      },
+      "required": [
+        "child"
+      ]
+    },
+    "paragraph": {
+      "description": "Wrapped text",
+      "props": {
+        "text": "string",
+        "scroll": "bool",
+        "id": "string"
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "list": {
+      "description": "Vertical list, optional selected row. An item is a string or {text, fg, bg, bold...} for a colored row. scroll:true (needs id) makes it scrollable",
+      "props": {
+        "items": "item[]",
+        "selected": "int",
+        "scroll": "bool",
+        "id": "string"
+      },
+      "required": [
+        "items"
+      ]
+    },
+    "gauge": {
+      "description": "Progress bar",
+      "props": {
+        "ratio": "float 0..1",
+        "label": "string"
+      },
+      "required": [
+        "ratio"
+      ]
+    },
+    "linegauge": {
+      "description": "Thin one-line progress bar",
+      "props": {
+        "ratio": "float 0..1",
+        "label": "string"
+      },
+      "required": [
+        "ratio"
+      ]
+    },
+    "chart": {
+      "description": "Line chart with axes. Each series is {name, data: [[x, y], ...], fg}; axis bounds follow the data",
+      "props": {
+        "series": "series[]",
+        "x_title": "string",
+        "y_title": "string"
+      },
+      "required": [
+        "series"
+      ]
+    },
+    "calendar": {
+      "description": "Month calendar. Highlights listed days (reverse video, or the given colour)",
+      "props": {
+        "year": "int",
+        "month": "int",
+        "highlight": "int[]"
+      },
+      "required": [
+        "year",
+        "month"
+      ]
+    },
+    "canvas": {
+      "description": "Free-form drawing on an x/y plane. shapes: line {x1,y1,x2,y2}, rect {x,y,w,h}, circle {x,y,r}, points {coords:[[x,y]]}, map {resolution: low|high}, text {x,y,text}; each takes fg",
+      "props": {
+        "x_bounds": "int[]",
+        "y_bounds": "int[]",
+        "shapes": "shape[]"
+      },
+      "required": [
+        "shapes"
+      ]
+    },
+    "logo": {
+      "description": "The ratatui logo",
+      "props": {
+        "size": "tiny|small"
+      },
+      "required": []
+    },
+    "mascot": {
+      "description": "The ratatui mascot (Ferris the rat)",
+      "props": {},
+      "required": []
+    },
+    "sparkline": {
+      "description": "Tiny line chart",
+      "props": {
+        "data": "int[]"
+      },
+      "required": [
+        "data"
+      ]
+    },
+    "tabs": {
+      "description": "Tab bar",
+      "props": {
+        "titles": "string[]",
+        "selected": "int"
+      },
+      "required": [
+        "titles"
+      ]
+    },
+    "table": {
+      "description": "Table with optional header. A row is a string[] or {cells: string[], fg, bg, bold...} for a colored row. scroll:true (needs id) makes it scrollable",
+      "props": {
+        "header": "string[]",
+        "rows": "row[]",
+        "widths": "constraint[]",
+        "scroll": "bool",
+        "id": "string"
+      },
+      "required": [
+        "rows"
+      ]
+    },
+    "barchart": {
+      "description": "Bar chart",
+      "props": {
+        "data": "[label, int][]",
+        "bar_width": "int"
+      },
+      "required": [
+        "data"
+      ]
+    },
+    "scrollbar": {
+      "description": "Scrollbar indicator",
+      "props": {
+        "content": "int",
+        "position": "int",
+        "orientation": "vertical|horizontal"
+      },
+      "required": [
+        "content",
+        "position"
+      ]
+    },
+    "input": {
+      "description": "Single-line text field",
+      "props": {
+        "title": "string",
+        "text": "string",
+        "cursor": "int",
+        "focused": "bool"
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "popup": {
+      "description": "Centered overlay on the whole frame; place last",
+      "props": {
+        "title": "string",
+        "width": "int percent",
+        "height": "int percent",
+        "child": "component"
+      },
+      "required": [
+        "child"
+      ]
+    },
+    "vstack": {
+      "description": "Vertical layout",
+      "props": {
+        "children": "component[]",
+        "sizes": "constraint[]"
+      },
+      "required": [
+        "children"
+      ]
+    },
+    "hstack": {
+      "description": "Horizontal layout",
+      "props": {
+        "children": "component[]",
+        "sizes": "constraint[]"
+      },
+      "required": [
+        "children"
+      ]
+    }
+  },
+  "constraint": "length:N | percent:N | min:N | max:N | fill:N",
+  "bindings": [
+    "Any prop value may be {\"$state\":\"/json/pointer\"}: replaced by that value from live state. A missing path drops the prop (the widget uses its default).",
+    "In a \"children\" array, {\"$each\":\"/array\",\"template\":{...}} repeats the template for each array item. Inside the template, {\"$item\":\"/field\"} reads a field of the current item.",
+    "Any node may carry \"$if\":\"/path\": it renders only when that state value is truthy (not null, false, 0, \"\" or empty).",
+    "Numeric props like selected, ratio and data take numbers, not strings.",
+    "{\"$pick\":{\"of\":{\"$state\":\"/pct\"},\"rules\":[[\">=90\",\"red\"],[\">=70\",\"yellow\"]],\"else\":\"green\"}} evaluates to the value of the first matching rule. Rules compare numbers (>=, <=, >, <, ==, !=; a trailing % is ignored) or text (==, !=). Use it anywhere a value goes, e.g. \"fg\".",
+    "Scrollable widgets (scroll:true plus a unique id): Tab moves focus, j/k or arrows scroll a line, PgUp/PgDn a page, g/G jump to top/bottom."
+  ]
+}

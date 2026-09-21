@@ -1,0 +1,12 @@
+[package]
+name = "ratatui_shim"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+crossterm = "0.29.0"
+ratatui = { version = "0.30.2", features = ["widget-calendar"] }
+time = "0.3"
+
+[lib]
+crate-type = ["staticlib", "cdylib", "rlib"]

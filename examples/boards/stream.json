@@ -1,0 +1,10 @@
+{
+  "herdr": {"direction": "down", "ratio": 0.4},
+  "sources": [
+    {"cmd": "i=0; while :; do echo \"{\\\"n\\\":\\\"$i\\\"}\"; i=$((i+1)); sleep 0.016; done", "stream": true, "into": "/tick"}
+  ],
+  "spec": {
+    "type": "block", "title": "stream (target 60 Hz)",
+    "child": {"type": "paragraph", "text": {"$state": "/tick/n"}}
+  }
+}

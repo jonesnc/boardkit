@@ -1,0 +1,17 @@
+{
+  "type": "vstack",
+  "sizes": ["length:3", "length:3", "fill:1", "length:3"],
+  "children": [
+    {"type": "tabs", "titles": ["Dash", "Help"], "selected": {"$state": "/screen"}, "fg": "cyan"},
+    {"type": "gauge", "ratio": {"$state": "/cpu"}, "label": {"$state": "/cpu_label"}, "fg": "green"},
+    {"type": "hstack", "sizes": ["percent:30", "fill:1"], "children": [
+      {"type": "block", "title": "Processes (j/k)", "child": {"type": "list", "items": {"$state": "/names"}, "selected": {"$state": "/sel"}}},
+      {"type": "block", "title": "Details", "child": {"type": "vstack", "children": [
+        {"$each": "/procs", "size": "length:1", "template": {"type": "paragraph", "text": {"$item": "/line"}}}
+      ]}}
+    ]},
+    {"type": "paragraph", "text": "j/k move   p popup   1/2 screen   q quit   (edit specdemo/dash.json live!)", "fg": "dark_gray"},
+    {"type": "popup", "$if": "/confirm", "title": "Confirm", "width": 40, "height": 30, "fg": "red",
+     "child": {"type": "paragraph", "text": {"$state": "/popup_text"}}}
+  ]
+}

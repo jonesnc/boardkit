@@ -1,0 +1,16 @@
+{
+  "herdr": {"direction": "down", "ratio": 0.5},
+  "sources": [
+    {"cmd": "jq -n -c 'now | floor % 100 as $p | {title: \"demo job\", status: \"running\", progress: ($p / 100), label: \"\\($p)%\", log: [range(0; $p / 10 | floor)] | map({msg: \"checked batch \\(.)\"}) | .[-8:]}'", "every": 0.5, "into": "/"}
+  ],
+  "spec": {
+    "type": "vstack", "sizes": ["length:3", "length:3", "fill:1"],
+    "children": [
+      {"type": "block", "title": {"$state": "/title"}, "child": {"type": "paragraph", "text": {"$state": "/status"}}},
+      {"type": "gauge", "ratio": {"$state": "/progress"}, "label": {"$state": "/label"}, "fg": "green"},
+      {"type": "block", "title": "Log", "child": {"type": "vstack", "children": [
+        {"$each": "/log", "size": "length:1", "template": {"type": "paragraph", "text": {"$item": "/msg"}}}
+      ]}}
+    ]
+  }
+}

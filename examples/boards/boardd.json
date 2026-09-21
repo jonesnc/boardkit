@@ -1,0 +1,12 @@
+{
+  "herdr": {"tab": "boardd", "direction": "right"},
+  "sources": [],
+  "spec": {
+    "type": "vstack",
+    "sizes": ["length:3", "fill:1"],
+    "children": [
+      {"type": "block", "title": "boardd", "child": {"type": "paragraph", "text": {"$state": "/boardd/summary"}}},
+      {"type": "block", "title": "Boards (name, status, pane, tab, data age, errors)", "child": {"type": "table", "header": ["Board", "Status", "Pane", "Tab", "Data", "Errors"], "rows": {"$state": "/boardd/rows"}, "size": "fill:1"}}
+    ]
+  }
+}

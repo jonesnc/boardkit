@@ -1,0 +1,8 @@
+{
+  "type": "vstack",
+  "sizes": ["length:3", "fill:1"],
+  "children": [
+    {"type": "tabs", "titles": ["Dash", "Help"], "selected": {"$state": "/screen"}, "fg": "cyan"},
+    {"type": "block", "title": "Help", "child": {"type": "paragraph", "text": "This screen is specdemo/help.json.\nSave the file while running: the UI reloads itself.\nPress 1 for the dashboard."}}
+  ]
+}

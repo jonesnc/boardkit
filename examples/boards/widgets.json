@@ -1,0 +1,19 @@
+{
+  "herdr": {"direction": "right", "ratio": 0.5},
+  "sources": [],
+  "spec": {
+    "type": "hstack", "sizes": ["fill:1", "fill:1"],
+    "children": [
+      {"type": "vstack", "sizes": ["length:9", "fill:1"], "children": [
+        {"type": "block", "title": "calendar", "child": {"type": "calendar", "year": 2026, "month": 9, "highlight": [20, 25], "fg": "green"}},
+        {"type": "block", "title": "logo", "child": {"type": "logo", "size": "small"}}
+      ]},
+      {"type": "block", "title": "canvas", "child": {"type": "canvas", "x_bounds": [0, 100], "y_bounds": [0, 50], "shapes": [
+        {"shape": "rect", "x": 5, "y": 5, "w": 30, "h": 20, "fg": "cyan"},
+        {"shape": "circle", "x": 60, "y": 25, "r": 15, "fg": "yellow"},
+        {"shape": "line", "x1": 0, "y1": 0, "x2": 100, "y2": 50, "fg": "red"},
+        {"shape": "text", "x": 8, "y": 40, "text": "canvas", "fg": "white"}
+      ]}}
+    ]
+  }
+}

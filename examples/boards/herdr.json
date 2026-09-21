@@ -1,0 +1,10 @@
+{
+  "herdr": {"direction": "right", "ratio": 0.5},
+  "spec": {
+    "type": "vstack", "sizes": ["fill:1", "length:8"],
+    "children": [
+      {"type": "block", "title": "herdr panes (id agent status label)", "child": {"type": "list", "items": {"$state": "/herdr/lines"}}},
+      {"type": "block", "title": "layout of this tab", "child": {"type": "table", "header": ["pane", "x", "y", "w", "h"], "rows": {"$state": "/herdr/layout_rows"}}}
+    ]
+  }
+}
