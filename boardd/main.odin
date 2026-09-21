@@ -247,12 +247,16 @@ send_data :: proc(s: ^Source, text: string) {
 	post(Msg{board = strings.clone(s.board), kind = .Data, into = strings.clone(s.into), value = v})
 }
 
-// Sleep `secs`, waking every 100 ms to check the stop flag. Returns false if stopped.
+// Sleep `secs`, waking at least every 100 ms to check the stop flag. Returns false if stopped.
+// Never sleeps past `until`: a fixed 100 ms slice made every interval below 0.1 s behave like 0.1 s
+// (and one just above it like 0.2 s), so `"every": 0.05` never ran faster than 10 times a second.
 nap :: proc(stop: ^Stop, secs: f64) -> bool {
 	until := time.tick_add(time.tick_now(), time.Duration(secs * f64(time.Second)))
-	for time.tick_diff(time.tick_now(), until) > 0 {
+	for {
+		left := time.tick_diff(time.tick_now(), until)
+		if left <= 0 do break
 		if stopped(stop) do return false
-		time.sleep(100 * time.Millisecond)
+		time.sleep(min(left, 100 * time.Millisecond))
 	}
 	return !stopped(stop)
 }
@@ -360,7 +364,9 @@ stream_source :: proc(s: ^Source) {
 				why = fmt.tprintf("no output for %vs; restarting", s.stale)
 				break loop
 			}
-			time.sleep(100 * time.Millisecond)
+			// Drain again within one 60 fps frame: a 100 ms nap here capped a
+			// fast stream at ~10 updates/s no matter how fast it printed.
+			time.sleep(4 * time.Millisecond)
 		}
 		run({"kill", "-TERM", "--", fmt.tprintf("-%d", p.pid)})
 		_, _ = os.process_wait(p)

@@ -1,21 +1,87 @@
 {
-  "herdr": {"direction": "right", "ratio": 0.5},
+  "herdr": {
+    "direction": "right",
+    "ratio": 0.5
+  },
   "sources": [
-    {"cmd": "jq -n -c 'now % 60 / 60 as $c | {cpu: $c, cpu_label: \"CPU \\($c * 100 | floor)%\", sel: 1, names: [\"nginx\",\"postgres\",\"redis\"], procs: [{line: \"nginx pid 1 mem 100 MB\"},{line: \"postgres pid 2 mem 200 MB\"},{line: \"redis pid 3 mem 300 MB\"}], confirm: ($c > 0.8), popup_text: \"CPU above 80%\"}'", "every": 1, "into": "/d"}
+    {
+      "cmd": "python3 -u -c \"import time,json\nwhile True:\n    c = (time.time()/6) % 1.0\n    print(json.dumps({'cpu': c, 'cpu_label': 'CPU %d%%' % (c*100), 'sel': 1, 'names': ['nginx','postgres','redis'], 'procs': [{'line':'nginx pid 1 mem 100 MB'},{'line':'postgres pid 2 mem 200 MB'},{'line':'redis pid 3 mem 300 MB'}], 'confirm': c > 0.8, 'popup_text': 'CPU above 80%'}), flush=True)\n    time.sleep(1/60)\"",
+      "stream": true,
+      "into": "/d"
+    }
   ],
   "spec": {
     "type": "vstack",
-    "sizes": ["length:3", "fill:1"],
+    "sizes": [
+      "length:3",
+      "fill:1"
+    ],
     "children": [
-      {"type": "gauge", "ratio": {"$state": "/d/cpu"}, "label": {"$state": "/d/cpu_label"}, "fg": "green"},
-      {"type": "hstack", "sizes": ["percent:30", "fill:1"], "children": [
-        {"type": "block", "title": "Processes", "child": {"type": "list", "items": {"$state": "/d/names"}, "selected": {"$state": "/d/sel"}}},
-        {"type": "block", "title": "Details ($each)", "child": {"type": "vstack", "children": [
-          {"$each": "/d/procs", "size": "length:1", "template": {"type": "paragraph", "text": {"$item": "/line"}}}
-        ]}}
-      ]},
-      {"type": "popup", "$if": "/d/confirm", "title": "$if popup", "width": 40, "height": 30, "fg": "red",
-       "child": {"type": "paragraph", "text": {"$state": "/d/popup_text"}}}
+      {
+        "type": "gauge",
+        "ratio": {
+          "$state": "/d/cpu"
+        },
+        "label": {
+          "$state": "/d/cpu_label"
+        },
+        "fg": "green"
+      },
+      {
+        "type": "hstack",
+        "sizes": [
+          "percent:30",
+          "fill:1"
+        ],
+        "children": [
+          {
+            "type": "block",
+            "title": "Processes",
+            "child": {
+              "type": "list",
+              "items": {
+                "$state": "/d/names"
+              },
+              "selected": {
+                "$state": "/d/sel"
+              }
+            }
+          },
+          {
+            "type": "block",
+            "title": "Details ($each)",
+            "child": {
+              "type": "vstack",
+              "children": [
+                {
+                  "$each": "/d/procs",
+                  "size": "length:1",
+                  "template": {
+                    "type": "paragraph",
+                    "text": {
+                      "$item": "/line"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "type": "popup",
+        "$if": "/d/confirm",
+        "title": "$if popup",
+        "width": 40,
+        "height": 30,
+        "fg": "red",
+        "child": {
+          "type": "paragraph",
+          "text": {
+            "$state": "/d/popup_text"
+          }
+        }
+      }
     ]
   }
 }

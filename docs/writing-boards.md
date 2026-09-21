@@ -71,6 +71,35 @@ was "what does this mean?". Build the label into the jq output
 for a column like `GAINED`: if the semantics are not obvious from the header,
 they belong in the block title.
 
+## Aim for about 60 updates per second, degrade only when forced
+
+The renderer is never the problem: a frame costs 0.25-0.8 ms and the viewer
+redraws only when state changes. What makes a board look slow is the data path.
+Measured ceilings, fastest first:
+
+| source shape | updates/sec | what limits it |
+|---|---|---|
+| `stream` whose command loops in-process (`python3 -u`, `awk`) | ~51 | boardd coalesces writes to one per 16 ms (62/s) |
+| `stream` spawning a process per line (`while :; do jq ...; done`) | ~30 | process spawn, ~34 ms each |
+| polled `"every": 0.02` | ~16 | `timeout`+`sh`+`jq` per sample |
+| polled `"every": 0.5` | 2 | the interval, as asked |
+
+So: for anything that should animate, use a `stream` and keep the loop inside
+one process. Use a polled source for anything you are sampling rather than
+animating — a database query has its own latency floor and 60 fps is neither
+possible nor wanted there.
+
+Before blaming boardd, check the data expression. **jq's `%` is integer
+modulo**, so `now % 60 / 60` yields only 60 distinct values and a gauge built on
+it steps exactly once a second no matter how often the source runs. Use
+`(now / 6) - (now / 6 | floor)` for a smooth sweep.
+
+Two fixed 100 ms sleeps used to cap every source at ~10/s regardless of
+settings (the stream drain loop, and `nap` for polled sources). Both are gone,
+but if a board seems pinned near 10/s, check that the running daemon is not an
+older binary: `md5sum /proc/$(systemctl --user show boardd -p MainPID --value)/exe
+boardd/boardd`.
+
 ## Cumulative counters make a dead-looking board
 
 Most `V$` style views report totals since the cursor or instance started. Ranking
