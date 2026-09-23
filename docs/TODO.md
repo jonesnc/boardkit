@@ -16,4 +16,4 @@ Open work, most useful first. Each item says what is blocking it, if anything.
 
 ## Done recently
 
-Port everything but the ratatui wrapper to Odin (`docs/design.md`); live boards moved out of the repo to `~/.config/boardkit/boards`; `boardd` watches extra directories; `boardd --check` and `test.sh`; `boardd` status board (`/boardd` state); stream `stale` restart; `chart`, `linegauge`, `calendar`, `canvas`, `logo`, `mascot` widgets; state directory `~/.cache/boardkit`.
+Source `judge` blocks: optional TypeSafe Jev, rules fallback; `~` contains rule in `$pick`; port everything but the ratatui wrapper to Odin (`docs/design.md`); live boards moved out of the repo to `~/.config/boardkit/boards`; `boardd` watches extra directories; `boardd --check` and `test.sh`; `boardd` status board (`/boardd` state); stream `stale` restart; `chart`, `linegauge`, `calendar`, `canvas`, `logo`, `mascot` widgets; state directory `~/.cache/boardkit`.

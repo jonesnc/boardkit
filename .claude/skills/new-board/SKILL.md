@@ -48,6 +48,8 @@ number in a header row.
 Prefer a rate or a delta over a cumulative total. A board that ranks by a
 counter-since-startup barely changes between refreshes and hides the present.
 
+If a pane must classify free text (log lines, alerts), add a `judge` block to the source instead of a long jq keyword chain. Read "Judging text" in `docs/writing-boards.md` first. Every question needs `rules` and `else`: the board must work with no TypeSafe key.
+
 ## 3. One source per board
 
 Write the queries into a jobs file, `~/.config/boardkit/jobs/<name>.json`:

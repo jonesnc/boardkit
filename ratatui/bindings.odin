@@ -77,10 +77,16 @@ resolve :: proc(v: Value, st: Value, item: Maybe(Value), allocator := context.te
 	return v, true
 }
 
-// {"of": <value>, "rules": [[">=90","red"], ...], "else": <value>}: first matching rule wins.
+// {"of": <value>, "rules": [[">=90","red"], ["~panic","red"], ...], "else": <value>}: first matching rule wins.
+// "~text" matches when the value (as text) contains text, ignoring case.
 pick :: proc(p: Value, st: Value, item: Maybe(Value)) -> (out: Value, ok: bool) {
 	of_spec := get(p, "of") or_return
 	of := resolve(of_spec, st, item) or_return
+	return pick_on(p, of, st, item)
+}
+
+// The rules of a $pick applied to an already resolved value.
+pick_on :: proc(p: Value, of: Value, st: Value, item: Maybe(Value)) -> (out: Value, ok: bool) {
 	num, has_num := as_f64(of)
 	text, has_text := as_str(of)
 	if !has_num && has_text {
@@ -92,6 +98,11 @@ pick :: proc(p: Value, st: Value, item: Maybe(Value)) -> (out: Value, ok: bool) 
 		cond, is_str := as_str(ra[0])
 		if !is_str do continue
 		cond = strings.trim_space(cond)
+		if strings.has_prefix(cond, "~") {
+			hay := text if has_text else to_json(of, context.temp_allocator)
+			if contains_fold(hay, cond[1:]) do return resolve(ra[1], st, item)
+			continue
+		}
 		op, rhs := "==", cond
 		for o in ([]string{"<=", ">=", "==", "!=", "<", ">"}) {
 			if strings.has_prefix(cond, o) {
@@ -120,6 +131,15 @@ pick :: proc(p: Value, st: Value, item: Maybe(Value)) -> (out: Value, ok: bool) 
 	}
 	e := get(p, "else") or_return
 	return resolve(e, st, item)
+}
+
+@(private)
+contains_fold :: proc(hay, needle: string) -> bool {
+	if needle == "" do return true
+	for i := 0; i + len(needle) <= len(hay); i += 1 {
+		if strings.equal_fold(hay[i:i + len(needle)], needle) do return true
+	}
+	return false
 }
 
 @(private)

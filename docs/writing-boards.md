@@ -115,6 +115,17 @@ the delta:
 - Keep a rolling array of the top delta for a `sparkline`; trend is nearly free
   once you are already diffing samples.
 
+## Judging text: ask small questions, keep rules as the floor
+
+A `judge` block turns text (a log line, a status message) into typed answers you can color and gauge. Jev answers when a TypeSafe key is set; the question's `rules` answer otherwise. Write it so the board is right without the key:
+
+- One property per question. "Did a job fail?" (noul) and "How bad?" (score) are two questions, not one "summarize the state".
+- Give each question only the text it needs: point `of` at the field, not the whole document.
+- Always give `rules` and `else`. They are the no-key path and the fallback when Jev is down. `~word` matches text in any case.
+- Keep deterministic checks in the source or in `$pick`. Ask the judge only what needs judgment.
+- Bind colors to `level` or `value`, not to `label` text. Show `by` somewhere quiet so you can tell which path answered.
+- `every` (default 2 s) is the fastest the judge asks; it asks only when the text changes. Jev calls never delay a frame or a source.
+
 ## Placement
 
 `herdr.tab` is found-or-created, but **`herdr.workspace` must already exist** —

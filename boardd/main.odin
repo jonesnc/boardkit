@@ -91,7 +91,7 @@ log :: proc(format: string, args: ..any) {
 // Run a command; returns (exit code, stdout, stderr). code = -1 if it could not start.
 // Not os.process_exec: that busy-polls its pipes while the child runs, burning a core per slow
 // source. Here stdout is a blocking pipe and stderr goes to a temp file (no pipe to deadlock on).
-run :: proc(cmd: []string, dir := "", allocator := context.temp_allocator) -> (code: int, out, errout: string) {
+run :: proc(cmd: []string, dir := "", env: []string = nil, allocator := context.temp_allocator) -> (code: int, out, errout: string) {
 	r, w, perr := os.pipe()
 	if perr != nil do return -1, "", fmt.aprint(perr, allocator = allocator)
 	ef, terr := os.create_temp_file("", "boardd-stderr-*")
@@ -102,7 +102,7 @@ run :: proc(cmd: []string, dir := "", allocator := context.temp_allocator) -> (c
 	}
 	os.remove(os.name(ef)) // unlinked now, so a killed boardd leaves nothing in /tmp
 	defer os.close(ef)
-	p, err := os.process_start({command = cmd, working_dir = dir, stdout = w, stderr = ef})
+	p, err := os.process_start({command = cmd, working_dir = dir, env = env, stdout = w, stderr = ef})
 	os.close(w)
 	if err != nil {
 		os.close(r)
@@ -231,6 +231,7 @@ Source :: struct {
 	idx, timeout:           int,
 	every, stale:           f64,
 	stop:                   ^Stop,
+	judge:                  ^Judge, // nil: no "judge" block
 }
 
 send_err :: proc(s: ^Source, msg: Maybe(string)) {
@@ -244,6 +245,7 @@ send_data :: proc(s: ^Source, text: string) {
 		rt.destroy(v)
 		v = json.String(strings.clone(t))
 	}
+	if s.judge != nil do judge_offer(s.judge, v)
 	post(Msg{board = strings.clone(s.board), kind = .Data, into = strings.clone(s.into), value = v})
 }
 
@@ -273,6 +275,7 @@ free_source :: proc(s: ^Source) {
 	delete(s.cmd)
 	delete(s.into)
 	delete(s.root)
+	if s.judge != nil do judge_release(s.judge)
 	free(s)
 }
 
@@ -396,6 +399,13 @@ spawn_sources :: proc(name: string, def: Value, root: string, stop: ^Stop) {
 		t, tok := rt.uint_of(s, "timeout")
 		src.timeout = max(int(t), 1) if tok else 10
 		src.stale, _ = rt.f64_of(s, "stale") // >0: restart the stream if it prints nothing for this many seconds
+		if jd, has_judge := rt.get(s, "judge"); has_judge {
+			if msg := rt.validate_judge(jd); msg != "" {
+				log("%s: source %d: %s (judge off)", name, idx, msg)
+			} else {
+				src.judge = judge_start(name, jd, idx, stop)
+			}
+		}
 		if rt.is_true(s, "stream") {
 			thread.create_and_start_with_poly_data(src, stream_source, self_cleanup = true)
 		} else {
@@ -465,7 +475,11 @@ error_list :: proc(e: map[int]string) -> Value {
 	keys := slice.map_keys(e, context.temp_allocator) or_else nil
 	slice.sort(keys)
 	out := make(json.Array)
-	for i in keys do append(&out, json.String(fmt.aprintf("source %d: %s", i, e[i])))
+	for i in keys {
+		what, n := "source", i
+		if i >= JUDGE_IDX do what, n = "judge", i - JUDGE_IDX
+		append(&out, json.String(fmt.aprintf("%s %d: %s", what, n, e[i])))
+	}
 	return out
 }
 
@@ -537,6 +551,11 @@ check_boards :: proc(dirs: []string) -> ! {
 				msg = "missing \"spec\""
 			} else {
 				msg = rt.validate_spec(s)
+				for src, i in rt.array_of(v, "sources") {
+					jd, has_judge := rt.get(src, "judge")
+					if msg != "" || !has_judge do continue
+					if m := rt.validate_judge(jd); m != "" do msg = fmt.tprintf("source %d: %s", i, m)
+				}
 			}
 			if msg == "" {
 				fmt.println("ok  ", e.fullpath)
