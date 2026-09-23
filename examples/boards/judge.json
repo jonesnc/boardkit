@@ -1,0 +1,66 @@
+{
+  "herdr": {
+    "direction": "down",
+    "ratio": 0.4
+  },
+  "sources": [
+    {
+      "cmd": "jq -n -c '[\"all jobs ok\", \"job 7: slow disk, retrying\", \"job 4: ERROR disk down\", \"dns timeout on fetch\"][(now / 5 | floor) % 4] as $l | {log: $l}'",
+      "every": 1,
+      "into": "/src",
+      "judge": {
+        "into": "/v",
+        "of": "/log",
+        "questions": {
+          "failing": {
+            "type": "noul",
+            "instructions": "Does this log line report a failed job?",
+            "criteria": {"true": "a job failed or is down", "false": "jobs ok or only slow"},
+            "rules": [["~error", true], ["~down", true]],
+            "else": false
+          },
+          "severity": {
+            "type": "score",
+            "instructions": "How badly is work affected?",
+            "criteria": ["ok", "degraded", "down"],
+            "rules": [["~down", 2], ["~slow", 1], ["~timeout", 1]],
+            "else": 0
+          },
+          "area": {
+            "type": "choice",
+            "instructions": "Which part of the system is affected?",
+            "criteria": {"none": "nothing is wrong", "disk": "storage, quotas, io", "net": "dns, timeouts, connections"},
+            "rules": [["~disk", "disk"], ["~dns", "net"], ["~timeout", "net"]],
+            "else": "none"
+          }
+        }
+      }
+    }
+  ],
+  "spec": {
+    "type": "vstack",
+    "sizes": ["length:3", "length:3", "length:1"],
+    "children": [
+      {
+        "type": "block",
+        "title": "log",
+        "child": {"type": "paragraph", "text": {"$state": "/src/log"}}
+      },
+      {
+        "type": "block",
+        "title": {"$pick": {"of": {"$state": "/v/failing/value"}, "rules": [[">=0.5", "verdict: FAILING"]], "else": "verdict"}},
+        "child": {
+          "type": "paragraph",
+          "text": {"$state": "/v/severity/label"},
+          "bold": true,
+          "fg": {"$pick": {"of": {"$state": "/v/severity/level"}, "rules": [[">=2", "red"], [">=1", "yellow"]], "else": "green"}}
+        }
+      },
+      {
+        "type": "paragraph",
+        "text": {"$state": "/v/area/value"},
+        "fg": {"$pick": {"of": {"$state": "/v/severity/by"}, "rules": [["==jev", "cyan"]], "else": "gray"}}
+      }
+    ]
+  }
+}

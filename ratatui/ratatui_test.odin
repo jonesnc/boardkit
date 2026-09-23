@@ -129,6 +129,63 @@ pick_rules :: proc(t: ^testing.T) {
 	testing.expect_value(t, rules(st, `{"$pick":{"of":{"$state":"/name"},"rules":[["==bob","yes"]],"else":"no"}}`), "yes")
 	r, _ := resolve(j(`{"type":"paragraph","text":"x","fg":{"$pick":{"of":{"$state":"/pct"},"rules":[[">=90","red"]]}}}`), st, nil)
 	testing.expect_value(t, str_of(r, "fg"), "red")
+	testing.expect_value(t, rules(st, `{"$pick":{"of":{"$state":"/name"},"rules":[["~OB","has"]],"else":"no"}}`), "has")
+	testing.expect_value(t, rules(st, `{"$pick":{"of":{"$state":"/name"},"rules":[["~zed","has"]],"else":"no"}}`), "no")
+}
+
+@(private = "file")
+JUDGE :: `{"into": "/v", "questions": {
+	"failing":  {"type": "noul", "instructions": "Did a job fail?", "rules": [["~error", true]], "else": false},
+	"severity": {"type": "score", "instructions": "How bad?", "criteria": ["ok", "degraded", "down"], "rules": [["~down", 2], ["~slow", 1]], "else": 0},
+	"area":     {"type": "choice", "instructions": "Which part?", "criteria": {"disk": "storage", "net": "dns"}, "rules": [["~dns", "net"]]}}}`
+
+@(test)
+judge_validates :: proc(t: ^testing.T) {
+	testing.expect_value(t, validate_judge(j(JUDGE)), "")
+	testing.expect(t, validate_judge(j(`{"questions": {}}`)) != "")
+	testing.expect(t, validate_judge(j(`{"into": "/v", "questions": {"a": {"type": "vibe", "instructions": "x"}}}`)) != "")
+	testing.expect(t, validate_judge(j(`{"into": "/v", "questions": {"a": {"type": "score", "instructions": "x", "criteria": ["one"]}}}`)) != "")
+	testing.expect(t, validate_judge(j(`{"into": "/v", "questions": {"a": {"type": "choice", "instructions": "x"}}}`)) != "")
+}
+
+@(test)
+judge_rules_without_jev :: proc(t: ^testing.T) {
+	a := judge_answers(j(JUDGE), j(`"disk slow; ERROR in job 4"`), nil, context.temp_allocator)
+	f, _ := get(a, "failing")
+	yes, _ := get(f, "yes")
+	testing.expect_value(t, yes.(json.Boolean), true)
+	testing.expect_value(t, str_of(f, "by"), "rules")
+	sv, _ := get(a, "severity")
+	testing.expect_value(t, str_of(sv, "label"), "degraded")
+	testing.expect(t, !has(a, "area"), "area: no rule matched and no else, so no answer")
+}
+
+@(test)
+judge_prefers_jev_and_fills_gaps :: proc(t: ^testing.T) {
+	resp := j(`{"model": "jev-1.13.0", "answers": {
+		"failing":  {"type": "noul", "noul": 0.2},
+		"severity": {"type": "score", "score": 1.9, "confidence": 0.7, "probabilities": {"0": 0, "1": 0.1, "2": 0.9}}}}`)
+	a := judge_answers(j(JUDGE), j(`"dns timeout, ERROR"`), resp, context.temp_allocator)
+	f, _ := get(a, "failing")
+	yes, _ := get(f, "yes")
+	testing.expect_value(t, yes.(json.Boolean), false)
+	testing.expect_value(t, str_of(f, "by"), "jev")
+	sv, _ := get(a, "severity")
+	testing.expect_value(t, str_of(sv, "label"), "down")
+	c, _ := f64_of(sv, "confidence")
+	testing.expect_value(t, c, 0.7)
+	ar, _ := get(a, "area")
+	testing.expect_value(t, str_of(ar, "value"), "net")
+	testing.expect_value(t, str_of(ar, "by"), "rules")
+}
+
+@(test)
+judge_request_keeps_rules_local :: proc(t: ^testing.T) {
+	body := j(judge_request(j(JUDGE), j(`"hi"`)))
+	testing.expect_value(t, str_of(body, "model"), "jev-latest")
+	testing.expect_value(t, str_of(body, "state"), "hi")
+	sv, _ := pointer(body, "/questions/severity")
+	testing.expect(t, has(sv, "criteria") && has(sv, "instructions") && !has(sv, "rules") && !has(sv, "else"))
 }
 
 @(private = "file")

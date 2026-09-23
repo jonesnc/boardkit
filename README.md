@@ -53,7 +53,7 @@ Data bindings (values come from live state, a JSON document):
 - `{"$state": "/a/b"}` any prop value; a missing path drops the prop.
 - `{"$each": "/arr", "size": "length:1", "template": {...}}` in a `children` array; `{"$item": "/field"}` inside.
 - `"$if": "/flag"` on any node.
-- `{"$pick": {"of": {"$state": "/pct"}, "rules": [[">=90","red"]], "else": "green"}}` conditional values (colors, text).
+- `{"$pick": {"of": {"$state": "/pct"}, "rules": [[">=90","red"], ["~panic","red"]], "else": "green"}}` conditional values (colors, text). `~text` matches when the value contains text (any case).
 - List items may be `{"text": .., "fg": ..}` and table rows `{"cells": [..], "fg": ..}` for colored rows.
 - `"scroll": true, "id": "x"` on list/table/paragraph: Tab focuses, j/k/arrows/PgUp/PgDn/g/G scroll.
 
@@ -63,6 +63,7 @@ A board is one JSON file: `{"herdr": {"tab","workspace","direction","ratio","par
 `herdr.tab` puts the board in its own herdr tab (found or created by label; boards sharing a label share the tab). `herdr.workspace` picks the workspace by label or id (default: the focused one). `parent` (a pane id or `board:<name>`) splits that pane instead. `"enabled": false` closes the pane but keeps the file.
 `sources` are shell commands whose stdout is JSON, written into state at `into` (`every` seconds, or `"stream": true` for one JSON line per update; add `"stale": <secs>` to restart a stream that goes silent; `"timeout"` defaults to 10 s).
 Watched directories: `<root>/boards` (root defaults to the repo that holds the binary), then extra args, then `$BOARDD_DIRS` (colon-separated) if set, else `~/.config/boardkit/boards`. Earlier directories win on a name clash.
+A source may add a `judge` block: typed questions about its output (`noul` yes/no, `choice`, `score`), answered into state. With a [TypeSafe](https://docs.typesafe.ai) key (`$TYPESAFE_API_KEY` or `~/.config/boardkit/typesafe.key`) boardd asks the Jev model; without one, or if Jev fails, each question's `$pick`-style `rules`/`else` answer instead, so every board works without Jev. Answers are `{"value", "confidence", "by": "jev"|"rules", ...}`; see `ratatui/judge.odin` and `examples/boards/judge.json`.
 Source failures and bad reloads show in a red banner on the bottom row. If a spec mentions `/herdr`, state includes herdr's workspaces, tabs, panes and layout; if it mentions `/boardd`, state includes every board's status, pane, tab, data age and errors (see `examples/boards/boardd.json`). State files live in `~/.cache/boardkit`.
 
 `./install.sh` runs it as a systemd user service (logs: `journalctl --user -u boardd -f`). Open panes keep the old binary until they are reopened.
