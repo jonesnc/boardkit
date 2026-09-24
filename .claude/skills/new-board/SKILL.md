@@ -79,7 +79,6 @@ Read the one closest to your backend before writing a new script.
 - `lensq '<jq>' <args...>` — one query, propagates the tool's exit code.
 - `lens-snap <jobs.json>` — many queries sequentially, merged into one object.
   This is the shape to copy for any connection-limited backend.
-- `seed-snap` — a tool that already emits one JSON object: only reshapes it.
 - `topsql-pprd.sh` — delta ranking against a cached previous sample.
 
 ### The snippet every new source script starts from
