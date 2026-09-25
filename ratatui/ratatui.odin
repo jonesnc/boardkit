@@ -23,6 +23,9 @@ Key :: enum i32 {
 	PageDown  = -11,
 	Home      = -12,
 	End       = -13,
+	WheelUp   = -14, // mouse events; mouse_pos gives where
+	WheelDown = -15,
+	Click     = -16,
 	Other     = -100,
 }
 
@@ -91,6 +94,7 @@ foreign shim {
 	rt_test_fg     :: proc(t: Term, x, y: u16, buf: [^]u8, cap: int) -> int ---
 	rt_color_ok    :: proc(s: ^string) -> i32 ---
 	rt_frame       :: proc(t: Term, cb: Frame_Proc, ud: rawptr) -> i32 ---
+	rt_mouse_pos   :: proc(x, y: ^u16) ---
 	rt_frame_area  :: proc(f: rawptr, out: ^Rect) ---
 	rt_layout      :: proc(area: ^Rect, vertical: i32, c: [^]Cons, n: int, out: [^]Rect) ---
 	rt_clear       :: proc(f: rawptr, area: ^Rect) ---
