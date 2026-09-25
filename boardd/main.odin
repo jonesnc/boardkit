@@ -295,7 +295,14 @@ poll_source :: proc(s: ^Source) {
 	context.temp_allocator = thread_scratch(&scratch)
 	defer virtual.arena_destroy(&scratch)
 	for !stopped(s.stop) {
-		code, out, errout := run({"timeout", "-k", "1", fmt.tprint(s.timeout), "sh", "-c", s.cmd}, s.root)
+		argv: []string
+		when ODIN_OS == .Linux {
+			argv = {"timeout", "-k", "1", fmt.tprint(s.timeout), "sh", "-c", s.cmd}
+		} else {
+			// macOS/BSD have no timeout(1); perl's alarm timer survives exec and kills the shell.
+			argv = {"perl", "-e", "alarm shift @ARGV; exec @ARGV or exit 127", fmt.tprint(s.timeout), "sh", "-c", s.cmd}
+		}
+		code, out, errout := run(argv, s.root)
 		if code == 0 {
 			send_data(s, out)
 			send_err(s, nil)
@@ -349,8 +356,15 @@ stream_source :: proc(s: ^Source) {
 			send_err(s, fmt.aprint(perr))
 			return
 		}
-		// setsid: own process group, so stopping kills the whole pipeline.
-		p, err := os.process_start({command = {"setsid", "sh", "-c", s.cmd}, working_dir = s.root, stdout = w})
+		// setsid gives the child its own process group so stopping kills the whole pipeline.
+		// macOS has no setsid(1); run the shell directly there (killing it stops the source).
+		scmd: []string
+		when ODIN_OS == .Linux {
+			scmd = {"setsid", "sh", "-c", s.cmd}
+		} else {
+			scmd = {"sh", "-c", s.cmd}
+		}
+		p, err := os.process_start({command = scmd, working_dir = s.root, stdout = w})
 		os.close(w)
 		if err != nil {
 			os.close(r)

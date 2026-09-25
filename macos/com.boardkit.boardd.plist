@@ -3,6 +3,10 @@
 <plist version="1.0">
 <dict>
   <key>Label</key><string>com.boardkit.boardd</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>@HOMEBREW@/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
   <key>ProgramArguments</key>
   <array>
     <string>@BOARDKIT@/boardd/boardd</string>
