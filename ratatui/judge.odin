@@ -18,6 +18,13 @@ package ratatui
 //   choice {"value": "net", "confidence": 0.8, "probabilities": {...}, "by": "jev"}
 //   score  {"value": 1.05, "level": 1, "label": "degraded", "confidence": 0.9, "probabilities": {...}, "by": "jev"}
 // Rule answers have "by": "rules" and confidence 1. A question with no answer is left out.
+//
+// Per row: with "each": "/rows", every item of that array is judged on its own ("of" is then relative
+// to the item, default the whole item), and <into> is an array of answers in row order. "set" writes
+// $pick results back into each row, reading the row's answers, e.g. to color it:
+//   "each": "/inflight", "of": "/cells", "set": {"/fg": {"of": "/state/value", "rules": [["==done", "darkgray"]]}}
+// Rows are sent to Jev in one request, one question per row and question ("<q>_r<n>"). Only rows whose
+// text changed are asked again.
 
 import "core:encoding/json"
 import "core:fmt"
@@ -53,6 +60,15 @@ validate_judge :: proc(jd: Value) -> string {
 			if _, ok := r.(json.Array); !ok do return fmt.tprintf("judge question %q: \"rules\" must be an array", k)
 		}
 	}
+	if e, has_e := get(jd, "each"); has_e {
+		if es, ok := as_str(e); !ok || !strings.has_prefix(es, "/") do return "judge \"each\" must be a path like \"/rows\""
+	}
+	if sv, has_set := get(jd, "set"); has_set {
+		so, ok := sv.(json.Object)
+		if !ok do return "judge \"set\" must be an object of {\"/path\": $pick}"
+		if !has(jd, "each") do return "judge \"set\" needs \"each\""
+		for k in sorted_keys(so) do if !strings.has_prefix(k, "/") do return fmt.tprintf("judge \"set\" key %q must start with /", k)
+	}
 	return ""
 }
 
@@ -61,13 +77,80 @@ judge_request :: proc(jd: Value, state: Value, allocator := context.temp_allocat
 	context.allocator = allocator
 	qs := make(json.Object)
 	qv, _ := get(jd, "questions")
-	for k, q in qv.(json.Object) or_else nil {
-		o := make(json.Object)
-		for f in ([]string{"type", "instructions", "criteria"}) {
-			if v, ok := get(q, f); ok do o[f] = v
+	for k, q in qv.(json.Object) or_else nil do qs[k] = jev_question(q, "")
+	return jev_body(jd, state, qs)
+}
+
+// One Jev request for several rows: state is {"items": {"r<n>": row}}, and each question is asked
+// once per row as "<q>_r<n>". `rows[i]` is the row numbered `ids[i]`.
+judge_rows_request :: proc(jd: Value, rows: []Value, ids: []int, allocator := context.temp_allocator) -> string {
+	context.allocator = allocator
+	items := make(json.Object)
+	qs := make(json.Object)
+	qv, _ := get(jd, "questions")
+	for row, i in rows {
+		id := fmt.aprintf("r%d", ids[i])
+		items[id] = row
+		for k, q in qv.(json.Object) or_else nil {
+			qs[fmt.aprintf("%s_%s", k, id)] = jev_question(q, fmt.aprintf("Answer only about items.%s. ", id))
 		}
-		qs[k] = o
 	}
+	state := make(json.Object)
+	state["items"] = items
+	return jev_body(jd, state, qs)
+}
+
+// The answers for row `id` of a judge_rows_request: Jev's where it has them, rules on `row` for the rest.
+judge_row_answers :: proc(jd: Value, row: Value, jev: Maybe(Value), id: int, allocator := context.allocator) -> Value {
+	out := make(json.Object, allocator = allocator)
+	qv, _ := get(jd, "questions")
+	answers, _ := get(jev.? or_else nil, "answers")
+	for k, q in qv.(json.Object) or_else nil {
+		a, ok := from_jev(q, answers, fmt.tprintf("%s_r%d", k, id), allocator)
+		if !ok do a, ok = from_rules(q, row, allocator)
+		if ok do out[strings.clone(k, allocator)] = a
+	}
+	return out
+}
+
+// The "set" writes for one row's answers: (path inside the row, value) pairs, owned by `allocator`.
+// A $pick whose rules miss and that has no "else" writes nothing.
+judge_row_sets :: proc(jd: Value, answers: Value, allocator := context.allocator) -> [dynamic]Set {
+	out := make([dynamic]Set, allocator)
+	sv, _ := get(jd, "set")
+	for k in sorted_keys(sv.(json.Object) or_else nil, context.temp_allocator) {
+		p := sv.(json.Object)[k]
+		of, _ := pointer(answers, str_of(p, "of"))
+		v: Value
+		ok: bool
+		{
+			context.allocator = context.temp_allocator
+			v, ok = pick_on(p, of, answers, nil)
+		}
+		if ok do append(&out, Set{path = strings.clone(k, allocator), value = clone(v, allocator)})
+	}
+	return out
+}
+
+Set :: struct {
+	path:  string,
+	value: Value,
+}
+
+@(private = "file")
+jev_question :: proc(q: Value, prefix: string) -> json.Object {
+	o := make(json.Object)
+	for f in ([]string{"type", "instructions", "criteria"}) {
+		v, ok := get(q, f)
+		if !ok do continue
+		if f == "instructions" && prefix != "" do v = json.String(strings.concatenate({prefix, str_of(q, f)}))
+		o[f] = v
+	}
+	return o
+}
+
+@(private = "file")
+jev_body :: proc(jd: Value, state: Value, qs: json.Object) -> string {
 	model := str_of(jd, "model")
 	body := make(json.Object)
 	body["state"] = state
