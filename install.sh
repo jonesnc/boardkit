@@ -43,16 +43,38 @@ done
 echo "==> building shim (cargo)"
 cargo build --release --manifest-path shim/Cargo.toml
 echo "==> building boardd (odin)"
-odin build boardd -out:boardd/boardd -extra-linker-flags:"-lgcc_s -lm -lpthread -ldl"
+if [ "$(uname -s)" = "Darwin" ]; then
+	odin build boardd -out:boardd/boardd
+else
+	odin build boardd -out:boardd/boardd -extra-linker-flags:"-lgcc_s -lm -lpthread -ldl"
+fi
 mkdir -p "$HOME/.config/boardkit/boards"
 echo "built $root/boardd/boardd; put boards in ~/.config/boardkit/boards"
 
 [ "$1" = "--no-service" ] && exit 0
-command -v systemctl >/dev/null || { echo "install.sh: no systemctl; run boardd/boardd inside herdr instead"; exit 0; }
-unit="$HOME/.config/systemd/user/boardd.service"
-mkdir -p "$(dirname "$unit")"
-sed "s#@BOARDKIT@#$root#" systemd/boardd.service > "$unit"
-systemctl --user daemon-reload
-systemctl --user enable --now boardd
-systemctl --user restart boardd # pick up a rebuilt binary
-echo "boardd service: $(systemctl --user is-active boardd) (logs: journalctl --user -u boardd -f)"
+
+case "$(uname -s)" in
+Darwin)
+	# launchd user agent (macOS)
+	plist="$HOME/Library/LaunchAgents/com.boardkit.boardd.plist"
+	mkdir -p "$(dirname "$plist")" "$HOME/Library/Logs"
+	sed -e "s#@BOARDKIT@#$root#g" -e "s#@HOME@#$HOME#g" macos/com.boardkit.boardd.plist > "$plist"
+	launchctl unload "$plist" 2>/dev/null || true
+	launchctl load "$plist"
+	echo "boardd agent: $(launchctl list | grep com.boardkit.boardd >/dev/null && echo loaded || echo failed) (logs: ~/Library/Logs/boardd.log)"
+	echo "note: boardd draws into herdr; start herdr for panes to appear."
+	;;
+Linux)
+	command -v systemctl >/dev/null || { echo "install.sh: no systemctl; run boardd/boardd inside herdr instead"; exit 0; }
+	unit="$HOME/.config/systemd/user/boardd.service"
+	mkdir -p "$(dirname "$unit")"
+	sed "s#@BOARDKIT@#$root#" systemd/boardd.service > "$unit"
+	systemctl --user daemon-reload
+	systemctl --user enable --now boardd
+	systemctl --user restart boardd # pick up a rebuilt binary
+	echo "boardd service: $(systemctl --user is-active boardd) (logs: journalctl --user -u boardd -f)"
+	;;
+*)
+	echo "install.sh: no service integration for $(uname -s); run boardd/boardd inside herdr"
+	;;
+esac
