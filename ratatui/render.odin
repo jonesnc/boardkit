@@ -29,6 +29,9 @@ Ui :: struct {
 	scroll:     map[string]int,
 	focus:      string,
 	focusables: [dynamic]string, // registered during the current frame, in draw order
+	areas:      [dynamic]Rect, // where each focusable was drawn, for the mouse
+	overflows:  [dynamic]bool, // each focusable has more rows than fit
+	chosen:     bool, // the user picked the focus (Tab or click); until then it follows the first overflowing widget
 }
 
 @(private)
@@ -39,6 +42,8 @@ ui_clear_focusables :: proc() {
 	context.allocator = runtime.heap_allocator() // ui state lives for the process
 	for f in ui.focusables do delete(f)
 	clear(&ui.focusables)
+	clear(&ui.areas)
+	clear(&ui.overflows)
 }
 
 @(private)
@@ -55,10 +60,29 @@ ui_set_focus :: proc(id: string) {
 	ui.focus = strings.clone(id)
 }
 
-// After a frame: keep focus on a registered widget, else the first one.
+// After a frame: keep focus on a registered widget. Until the user picks one, prefer the first that
+// can scroll, so the keys move something (an empty table drawn first would otherwise take them).
 @(private)
 ui_fix_focus :: proc() {
-	if !ui_has(ui.focus) do ui_set_focus(ui.focusables[0] if len(ui.focusables) > 0 else "")
+	if ui.chosen && ui_has(ui.focus) do return
+	want := ui.focus if ui_has(ui.focus) else (ui.focusables[0] if len(ui.focusables) > 0 else "")
+	for f, i in ui.focusables do if ui.overflows[i] {
+		want = f
+		break
+	}
+	if want != ui.focus {
+		ui_set_focus(want)
+		dirty = true // the scrollbar color follows focus
+	}
+}
+
+// The focusable under the last mouse event, or "".
+@(private)
+ui_under_mouse :: proc() -> string {
+	x, y: u16
+	rt_mouse_pos(&x, &y)
+	for a, i in ui.areas do if x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h do return ui.focusables[i]
+	return ""
 }
 
 // Reserve a scrollbar column and return (first visible row, content area). Non-scrollable widgets pass through.
@@ -71,6 +95,8 @@ scroll_view :: proc(f: rawptr, area: Rect, v: Value, content_len: int, reserved:
 	visible := int(area.h - min(reserved, area.h))
 	maxoff := max(content_len - visible, 0)
 	append(&ui.focusables, strings.clone(id))
+	append(&ui.areas, area)
+	append(&ui.overflows, maxoff > 0)
 	if ui.focus == "" do ui_set_focus(id)
 	off := min(ui.scroll[id] or_else 0, maxoff)
 	if id not_in ui.scroll {
@@ -100,6 +126,17 @@ ui_handle_key :: proc(k: i32) -> bool {
 		i := 0
 		for f, j in ui.focusables do if f == cur do i = j
 		ui_set_focus(ui.focusables[(i + 1) % len(ui.focusables)])
+		ui.chosen = true
+	case k == -16:
+		at := ui_under_mouse()
+		if at == "" do return false
+		ui_set_focus(at)
+		ui.chosen = true
+	case k == -14 || k == -15:
+		at := ui_under_mouse()
+		if at == "" do at = cur
+		if k == -14 do step(at, proc(o: int) -> int { return max(o - 3, 0) })
+		else do step(at, proc(o: int) -> int { return o + 3 })
 	case k == 'j' || k == -5: step(cur, proc(o: int) -> int { return o + 1 })
 	case k == 'k' || k == -4: step(cur, proc(o: int) -> int { return max(o - 1, 0) })
 	case k == -11:            step(cur, proc(o: int) -> int { return o + 10 })

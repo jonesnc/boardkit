@@ -124,6 +124,7 @@ A `judge` block turns text (a log line, a status message) into typed answers you
 - Always give `rules` and `else`. They are the no-key path and the fallback when Jev is down. `~word` matches text in any case.
 - Keep deterministic checks in the source or in `$pick`. Ask the judge only what needs judgment.
 - Bind colors to `level` or `value`, not to `label` text. Show `by` somewhere quiet so you can tell which path answered.
+- For tables, judge per row with `"each"` and color rows with `"set"`, not one question about the whole table. A row judgment ("is this item done?") is single-hop, which is what Jev is good at.
 - `every` (default 2 s) is the fastest the judge asks; it asks only when the text changes. Jev calls never delay a frame or a source.
 
 ## Placement

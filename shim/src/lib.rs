@@ -3,10 +3,10 @@
 //! hot reload live in Odin (../ratatui). See docs/design.md: prefer Odin unless Rust is necessary.
 
 use std::ffi::c_void;
-use std::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering::Relaxed};
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
 use ratatui::{
     DefaultTerminal, Frame, Terminal,
     backend::TestBackend,
@@ -24,6 +24,7 @@ use ratatui::{
 };
 
 static RESIZED: AtomicBool = AtomicBool::new(false);
+static MOUSE: AtomicU32 = AtomicU32::new(0); // column << 16 | row of the last mouse event
 
 /// A real terminal, or an in-memory one for tests.
 pub enum Term {
@@ -188,7 +189,10 @@ fn frame<'a>(f: *mut c_void) -> &'a mut Frame<'a> {
 /// Enter raw mode + alt screen. Returns an opaque handle.
 #[unsafe(no_mangle)]
 pub extern "C" fn rt_init() -> *mut Term {
-    Box::into_raw(Box::new(Term::Real(ratatui::init())))
+    let t = ratatui::init();
+    // Mouse capture, so the wheel scrolls the table under the pointer (rt_mouse_pos).
+    let _ = crossterm::execute!(std::io::stdout(), EnableMouseCapture);
+    Box::into_raw(Box::new(Term::Real(t)))
 }
 
 /// An in-memory w x h terminal for tests. Free with rt_restore.
@@ -209,13 +213,15 @@ pub unsafe extern "C" fn rt_restore(t: *mut Term) {
     let real = matches!(unsafe { &*t }, Term::Real(_));
     drop(unsafe { Box::from_raw(t) });
     if real {
+        let _ = crossterm::execute!(std::io::stdout(), DisableMouseCapture);
         ratatui::restore();
     }
 }
 
 /// Wait up to `timeout_ms` for a key press. Returns the char code, a negative
 /// special code (-1 none, -2 esc, -3 enter, -4 up, -5 down, -6 left, -7 right,
-/// -8 backspace, -9 tab, -10 pgup, -11 pgdn, -12 home, -13 end), or -100 for any other key.
+/// -8 backspace, -9 tab, -10 pgup, -11 pgdn, -12 home, -13 end, -14 wheel up, -15 wheel down,
+/// -16 left click; rt_mouse_pos gives where), or -100 for any other key.
 #[unsafe(no_mangle)]
 pub extern "C" fn rt_poll_key(timeout_ms: u32) -> i32 {
     if !event::poll(Duration::from_millis(timeout_ms as u64)).unwrap_or(false) {
@@ -225,6 +231,15 @@ pub extern "C" fn rt_poll_key(timeout_ms: u32) -> i32 {
         Ok(Event::Resize(..)) => {
             RESIZED.store(true, Relaxed);
             -1
+        }
+        Ok(Event::Mouse(m)) => {
+            MOUSE.store(((m.column as u32) << 16) | m.row as u32, Relaxed);
+            match m.kind {
+                MouseEventKind::ScrollUp => -14,
+                MouseEventKind::ScrollDown => -15,
+                MouseEventKind::Down(MouseButton::Left) => -16,
+                _ => -1,
+            }
         }
         Ok(Event::Key(k)) if k.kind == KeyEventKind::Press => match k.code {
             KeyCode::Char(c) => c as i32,
@@ -243,6 +258,15 @@ pub extern "C" fn rt_poll_key(timeout_ms: u32) -> i32 {
             _ => -100,
         },
         _ => -1,
+    }
+}
+
+/// Where the last mouse event happened (column, row).
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn rt_mouse_pos(x: *mut u16, y: *mut u16) {
+    let v = MOUSE.load(Relaxed);
+    if let (Some(x), Some(y)) = (unsafe { x.as_mut() }, unsafe { y.as_mut() }) {
+        (*x, *y) = ((v >> 16) as u16, v as u16);
     }
 }
 

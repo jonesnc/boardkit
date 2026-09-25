@@ -247,6 +247,7 @@ send_data :: proc(s: ^Source, text: string) {
 	}
 	if s.judge != nil do judge_offer(s.judge, v)
 	post(Msg{board = strings.clone(s.board), kind = .Data, into = strings.clone(s.into), value = v})
+	if s.judge != nil do judge_wake(s.judge)
 }
 
 // Sleep `secs`, waking at least every 100 ms to check the stop flag. Returns false if stopped.
