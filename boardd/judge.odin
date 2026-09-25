@@ -51,7 +51,9 @@ judge_release :: proc(j: ^Judge) {
 	free(j)
 }
 
-// Called from the source thread with its freshly parsed output.
+// Called from the source thread with its freshly parsed output. The source posts its data before
+// judge_wake, so the judge's answers always land after it: an "into": "/" source replaces the whole
+// state, answers included.
 judge_offer :: proc(j: ^Judge, v: Value) {
 	sel, found := rt.pointer(v, j.of)
 	if !found do return
@@ -60,6 +62,9 @@ judge_offer :: proc(j: ^Judge, v: Value) {
 	delete(j.input)
 	j.input = text
 	sync.mutex_unlock(&j.mu)
+}
+
+judge_wake :: proc(j: ^Judge) {
 	sync.sema_post(&j.ready)
 }
 
@@ -70,6 +75,8 @@ judge_loop :: proc(j: ^Judge) {
 	defer virtual.arena_destroy(&scratch)
 	last := ""
 	defer delete(last)
+	kept: Value // the last answers; sent again for unchanged text, which costs no Jev call
+	defer rt.destroy(kept)
 	for !stopped(j.stop) {
 		if !sync.sema_wait_with_timeout(&j.ready, 100 * time.Millisecond) do continue
 		sync.mutex_lock(&j.mu)
@@ -79,6 +86,7 @@ judge_loop :: proc(j: ^Judge) {
 		if text == "" do continue
 		if text == last {
 			delete(text)
+			if kept != nil do post(Msg{board = strings.clone(j.board), kind = .Data, into = strings.clone(j.into), value = rt.clone(kept)})
 			continue
 		}
 		delete(last)
@@ -86,6 +94,8 @@ judge_loop :: proc(j: ^Judge) {
 		state, _ := rt.parse_json(text, context.temp_allocator)
 		jev, err := ask_jev(j, state)
 		answers := rt.judge_answers(j.def, state, jev)
+		rt.destroy(kept)
+		kept = rt.clone(answers)
 		post(Msg{board = strings.clone(j.board), kind = .Data, into = strings.clone(j.into), value = answers})
 		post(Msg{board = strings.clone(j.board), kind = .Err, idx = j.idx + JUDGE_IDX, msg = err})
 		free_all(context.temp_allocator)
