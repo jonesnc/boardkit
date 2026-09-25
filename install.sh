@@ -58,7 +58,7 @@ Darwin)
 	# launchd user agent (macOS)
 	plist="$HOME/Library/LaunchAgents/com.boardkit.boardd.plist"
 	mkdir -p "$(dirname "$plist")" "$HOME/Library/Logs"
-	sed -e "s#@BOARDKIT@#$root#g" -e "s#@HOME@#$HOME#g" macos/com.boardkit.boardd.plist > "$plist"
+	sed -e "s#@BOARDKIT@#$root#g" -e "s#@HOME@#$HOME#g" -e "s#@HOMEBREW@#$(brew --prefix 2>/dev/null || echo /opt/homebrew)#g" macos/com.boardkit.boardd.plist > "$plist"
 	launchctl unload "$plist" 2>/dev/null || true
 	launchctl load "$plist"
 	echo "boardd agent: $(launchctl list | grep com.boardkit.boardd >/dev/null && echo loaded || echo failed) (logs: ~/Library/Logs/boardd.log)"
