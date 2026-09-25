@@ -129,11 +129,10 @@ A `judge` block turns text (a log line, a status message) into typed answers you
 
 ## Placement
 
-`herdr.tab` is found-or-created, but **`herdr.workspace` must already exist** —
-boardd looks it up by label and logs `workspace ... not found` otherwise. Create
-it first (`herdr workspace create --label <name> --no-focus`), and keep the label
-in the board file so the placement survives a restart. Renaming the workspace in
-herdr without editing the board file breaks the lookup.
+`herdr.tab` and `herdr.workspace` are both found-or-created by label. A missing
+workspace is created (unfocused) and its first tab is renamed to `herdr.tab`.
+Renaming the workspace in herdr without editing the board file makes boardd
+create a new one under the old label.
 
 Boards belong in `~/.config/boardkit/boards/`, not the repo's `boards/` (which is
 gitignored and exists for scratch use).

@@ -174,8 +174,15 @@ place_in_tab :: proc(workspace: Maybe(string), tab, direction: string, ratio: Ma
 		if !found && len(wss) > 0 do ws, found = wss[0], true
 	}
 	if !found {
-		log("workspace %v not found", workspace)
-		return "", false
+		// A named workspace that does not exist yet is created; its first tab becomes `tab`.
+		w := workspace.? or_else ""
+		if w == "" do return "", false
+		r := herdr("workspace", "create", "--label", w, "--cwd", root, "--no-focus") or_return
+		rp, _ := rt.get(r, "root_pane")
+		id, tid := rt.str_of(rp, "pane_id"), rt.str_of(rp, "tab_id")
+		if tid != "" do herdr("tab", "rename", tid, tab)
+		log("workspace %s created", w)
+		return id, id != ""
 	}
 	ws_id := rt.str_of(ws, "workspace_id")
 	tl := herdr("tab", "list") or_return
