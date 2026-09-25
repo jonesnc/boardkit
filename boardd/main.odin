@@ -20,6 +20,7 @@ import "core:strings"
 import "core:sync"
 import "core:sync/chan"
 import "core:thread"
+import "core:sys/posix"
 import "core:time"
 import rt "../ratatui"
 
@@ -607,6 +608,8 @@ set_pane :: proc(b: ^Board, id: Maybe(string)) {
 // `boardd view <spec-or-board.json> [state.json]`: draw one board full-screen at 60 fps. Spec and
 // state files hot-reload when they change. q or Esc quits. Scrollable widgets: Tab focus,
 // j/k/arrows, PgUp/PgDn, g/G. boardd runs this in each board pane.
+// When the boardd binary is rebuilt, the viewer re-execs itself, so open panes pick up the new
+// viewer without being reopened.
 view :: proc(args: []string) -> ! {
 	if len(args) < 1 {
 		fmt.eprintln("usage: boardd view <spec-or-board.json> [state.json]")
@@ -618,10 +621,28 @@ view :: proc(args: []string) -> ! {
 		os.exit(1)
 	}
 	if len(args) > 1 do rt.state_watch(strings.clone_to_cstring(args[1]))
+	exe, _ := os.get_executable_path(context.allocator) // read now: after a rebuild it names a deleted file
+	built := exe_stamp(exe)
+	seen, seen_at := built, time.now()
 	t := rt.init()
 	clock := rt.clock_make(60)
 	loop: for {
 		rt.draw(t, spec)
+		if time.since(seen_at) > time.Second {
+			// Re-exec only once the new binary has stopped changing, so a build still writing it is not run.
+			if now := exe_stamp(exe); now != seen {
+				seen = now
+			} else if seen != built && seen != {} {
+				rt.restore(t)
+				argv := make([]cstring, len(args) + 3)
+				argv[0], argv[1] = strings.clone_to_cstring(exe), "view"
+				for a, i in args do argv[i + 2] = strings.clone_to_cstring(a)
+				posix.execv(argv[0], raw_data(argv))
+				built = seen // exec failed: keep running this binary
+				t = rt.init()
+			}
+			seen_at = time.now()
+		}
 		for k := rt.frame_wait(&clock); k != i32(rt.Key.None); k = rt.poll_key(0) {
 			if k == 'q' || k == i32(rt.Key.Esc) do break loop
 			rt.ui_key(k)
@@ -629,6 +650,16 @@ view :: proc(args: []string) -> ! {
 	}
 	rt.restore(t)
 	os.exit(0)
+}
+
+// A binary's modification time and size; zero if it cannot be read.
+exe_stamp :: proc(path: string) -> (stamp: struct {
+		mtime: time.Time,
+		size:  i64,
+	}) {
+	fi, err := os.stat(path, context.temp_allocator)
+	if err != nil do return
+	return {fi.modification_time, fi.size}
 }
 
 main :: proc() {
