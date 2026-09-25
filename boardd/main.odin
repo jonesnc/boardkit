@@ -26,11 +26,12 @@ import rt "../ratatui"
 
 Value :: rt.Value
 
-foreign import libc "system:c"
-
-@(default_calling_convention = "c")
-foreign libc {
-	mallopt :: proc(param: i32, value: i32) -> i32 ---
+when ODIN_OS == .Linux {
+	foreign import libc "system:c"
+	@(default_calling_convention = "c")
+	foreign libc {
+		mallopt :: proc(param: i32, value: i32) -> i32 ---
+	}
 }
 
 M_MMAP_THRESHOLD :: -3
@@ -674,8 +675,11 @@ main :: proc() {
 	// temp arenas). By default glibc gives each thread its own malloc arena and, after the first
 	// big free, serves big blocks from the heap and keeps them: RSS climbs by tens of MB. A fixed
 	// mmap threshold returns big blocks to the OS on free; one arena is plenty for this load.
-	mallopt(M_MMAP_THRESHOLD, 128 * 1024)
-	mallopt(M_ARENA_MAX, 1)
+	// glibc-only heap tuning; macOS malloc returns big freed blocks to the OS already.
+	when ODIN_OS == .Linux {
+		mallopt(M_MMAP_THRESHOLD, 128 * 1024)
+		mallopt(M_ARENA_MAX, 1)
+	}
 	args := os.args
 	if len(args) > 1 && args[1] == "view" do view(args[2:])
 	home := os.get_env("HOME", context.allocator)
