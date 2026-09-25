@@ -6,7 +6,7 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering::Relaxed};
 use std::time::Duration;
 
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, MouseButton, MouseEventKind};
 use ratatui::{
     DefaultTerminal, Frame, Terminal,
     backend::TestBackend,
@@ -190,8 +190,11 @@ fn frame<'a>(f: *mut c_void) -> &'a mut Frame<'a> {
 #[unsafe(no_mangle)]
 pub extern "C" fn rt_init() -> *mut Term {
     let t = ratatui::init();
-    // Mouse capture, so the wheel scrolls the table under the pointer (rt_mouse_pos).
-    let _ = crossterm::execute!(std::io::stdout(), EnableMouseCapture);
+    // Alternate scroll mode (DECSET 1007): the terminal sends the wheel as Up/Down keys, so the
+    // focused table scrolls and the mouse stays free for selecting text. Full mouse capture
+    // (EnableMouseCapture) would make rt_mouse_pos work but takes drag-select away.
+    let _ = std::io::Write::write_all(&mut std::io::stdout(), b"\x1b[?1007h");
+    let _ = std::io::Write::flush(&mut std::io::stdout());
     Box::into_raw(Box::new(Term::Real(t)))
 }
 
@@ -213,7 +216,7 @@ pub unsafe extern "C" fn rt_restore(t: *mut Term) {
     let real = matches!(unsafe { &*t }, Term::Real(_));
     drop(unsafe { Box::from_raw(t) });
     if real {
-        let _ = crossterm::execute!(std::io::stdout(), DisableMouseCapture);
+        let _ = std::io::Write::write_all(&mut std::io::stdout(), b"\x1b[?1007l");
         ratatui::restore();
     }
 }
