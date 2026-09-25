@@ -107,9 +107,7 @@ Then `chmod +x` it and verify with the `env -i` line from step 1.
 
     "herdr": {"workspace": "boardd", "tab": "<short name>", "direction": "right", "ratio": 0.5}
 
-The workspace must already exist. Check with `herdr workspace list`; create it
-with `herdr workspace create --label <name> --no-focus` before the board is
-written, or boardd logs `workspace ... not found`.
+boardd creates the workspace if no workspace has that label.
 
 Label every number in the jq output, not in the spec
 (`"txns " + (.TXN_COUNT|tostring)`). Put counts and status in the enclosing
